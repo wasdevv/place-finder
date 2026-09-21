@@ -28,6 +28,10 @@ const placeSchema = new mongoose.Schema(
     hours: str(500),
     rating: { type: Number, min: 0, max: 5 },
     tags: [str(40)],
+    source: { type: String, enum: ['osm', 'manual'], default: 'manual' },
+    osmId: { type: String, unique: true, sparse: true },
+    seenAt: Date,
+    stale: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

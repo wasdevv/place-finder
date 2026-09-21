@@ -25,7 +25,9 @@ export function longitude(value) {
   return n;
 }
 
-export const CATEGORIES = ['pharmacy', 'mall', 'park', 'zoo', 'water'];
+export const CATEGORIES = [
+  'pharmacy', 'mall', 'park', 'zoo', 'water', 'hospital', 'culture', 'sports', 'fuel', 'ice_cream', 'transit',
+];
 
 export function category(value) {
   if (value === undefined || value === '') return undefined;

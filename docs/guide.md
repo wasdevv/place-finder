@@ -20,8 +20,11 @@ server/
   places.js             /api/places routes
   validation.js         Input parsing and validation, Haversine distance
   validation.test.js    Tests for validation.js
-  seed.js               Demo data loader
-  seed-places.json      Demo places (from OpenStreetMap)
+  auth.js               Bearer token check for the sync and admin routes
+  sources.js            Which OSM tags become which category, and OSM element → place
+  sources.test.js       Tests for sources.js, with elements copied from real Overpass responses
+  sync.js               Pulls places from OpenStreetMap and upserts them
+  sync-cli.js           `npm run sync`
 frontend/
   index.html
   src/
@@ -46,7 +49,8 @@ Vercel turns every file under `api/` into its own serverless function. Keeping `
 - **Validation** (`validation.js`): every query parameter and the `POST` body pass through pure functions that throw a 400 `ValidationError`. The body is rebuilt from an allowlist, so unknown fields (`_id`, `createdAt`, anything else) never reach the database. Zero is a valid coordinate and a valid rating; the checks use `Number.isFinite`, not truthiness.
 - **Search** escapes regex metacharacters, so `.*` or `[` are searched as text. A case-insensitive regex is fine for a few thousand documents; past that, move to Atlas Search.
 - **Nearby** uses `$near` on the 2dsphere index, which already returns the closest 100 sorted by distance, then adds `distance` in km with the Haversine formula. Search results get `distance` too when the client sends `lat`/`lng`.
-- **Errors** (`app.js`): malformed JSON is 400, bodies over 10 kB are 413, validation is 400, database problems are 503 and anything else is a generic 500 that is logged but not exposed.
+- **Errors** (`app.js`): malformed JSON is 400, bodies over 10 kB are 413, validation is 400, database problems are 503, OpenStreetMap being down is 502 and anything else is a generic 500 that is logged but not exposed.
+- **Auth** (`auth.js`): `/api/sync` needs `Authorization: Bearer $CRON_SECRET` and `POST /api/places` needs `Authorization: Bearer $ADMIN_TOKEN`. When the variable is not set the route answers 503 instead of opening up, so forgetting a variable never makes a write public. Tokens are compared in constant time.
 
 ### Frontend
 
@@ -73,20 +77,54 @@ export const categories = {
 export const demoLocation = { lat: -23.5505, lng: -46.6333, city: 'São Paulo' };
 ```
 
-`Icon` is any [Lucide](https://lucide.dev/icons) icon. A category key must also be in `CATEGORIES` in `server/validation.js`, which the schema and the API use to reject unknown values. Other colors are CSS variables at the top of `styles.css`.
+`Icon` is any [Lucide](https://lucide.dev/icons) icon. A category key must also be in `CATEGORIES` in `server/validation.js`, which the schema and the API use to reject unknown values, and in `SOURCES` in `server/sources.js` if it should come from OpenStreetMap. Other colors are CSS variables at the top of `styles.css`.
 
-## Demo data
+## OpenStreetMap sync
 
-`server/seed-places.json` holds 71 real places in São José do Rio Preto taken from OpenStreetMap: 46 pharmacies, 10 malls, 11 parks, the zoo, the Represa Municipal, a lake and a point on the Rio Preto. Coordinates, names, street addresses, phones and opening hours come from OSM tags; missing street names and the neighborhoods come from Nominatim reverse geocoding. OSM data is © OpenStreetMap contributors under the [ODbL](https://www.openstreetmap.org/copyright), which the map attribution already credits.
+Places come from [OpenStreetMap](https://www.openstreetmap.org) and are refreshed every day. OSM data is © OpenStreetMap contributors under the [ODbL](https://www.openstreetmap.org/copyright), which the map attribution already credits. Each detail page links to its OSM element, so a wrong phone or address is fixed at the source and shows up after the next sync.
 
-To use your own data, replace the JSON file (same fields as the `POST` body) and run `npm run seed -- --replace`.
+### What is fetched
+
+`SOURCES` in `server/sources.js` is the whole mapping, one line per OSM tag:
+
+| Category | OSM tag |
+|---|---|
+| `pharmacy` | `amenity=pharmacy` |
+| `mall` | `shop=mall` |
+| `park` | `leisure=park` whose name starts with "Parque" (squares are also tagged as parks and would flood the map) |
+| `zoo` | `tourism=zoo` |
+| `water` | `natural=water` named "Lago…" or "Represa…", and `waterway=river` |
+| `hospital` | `amenity=hospital` |
+| `culture` | `amenity=theatre`, `cinema`, `library` and `tourism=museum` |
+| `sports` | `leisure=stadium` |
+| `fuel` | `amenity=fuel` |
+| `ice_cream` | `amenity=ice_cream` |
+| `transit` | `amenity=bus_station` |
+
+Only named elements inside the city boundary (`AREA`) are used. Buildings and areas become their center point. A river is a line split into many segments, so each named river becomes a single point: the middle of its longest segment.
+
+### How a run works (`server/sync.js`)
+
+1. One Overpass query fetches everything. If the main server fails, times out or answers with a partial result, a mirror is tried; if both fail the run stops with a 502 and nothing in the database changes.
+2. Each element is upserted by `osmId` (`node/123`, `way/456`) with name, category, coordinates, phone, website and hours. Fields removed in OSM are removed here too.
+3. Street and neighborhood come from the OSM `addr:*` tags. When they are missing, and only for places not in the database yet, Nominatim reverse geocoding fills them in. Nominatim allows one request per second, so the cron resolves at most 40 new places per run and leaves the rest for the next day (`pending` in the result). `npm run sync` has no limit.
+4. OSM places that were not in this run are marked `stale` and disappear from the list and the map; their detail page still works. They come back if they reappear in OSM. If a run returns fewer than half of the places already on file, the stale step is skipped (`staleCheck` in the result), so a bad Overpass response cannot hide the whole city.
+5. Places added through `POST /api/places` have `source: "manual"` and are never touched by the sync.
+
+### Running it
+
+- Locally: `npm run sync`. The first run takes a few minutes because of Nominatim. `npm run sync -- --replace` empties the collection first, but only after OpenStreetMap answered, so a failed download never leaves it empty.
+- In production: Vercel Cron calls `GET /api/sync` every day at 06:00 UTC (`crons` in `vercel.json`) and sends `CRON_SECRET` as a bearer token. `maxDuration` is 300 seconds so Overpass and 40 lookups fit in one run.
+- By hand in production: `curl -H "Authorization: Bearer $CRON_SECRET" https://<your-app>.vercel.app/api/sync`.
+
+The result is a JSON summary: `{ found, inserted, updated, pending, skipped, stale, staleCheck }`. `skipped` counts elements that failed validation, like a phone number over 40 characters.
 
 ## Data model
 
 | Field | Type | Notes |
 |---|---|---|
 | `name` | string | required, max 120 |
-| `category` | string | required: `pharmacy`, `mall`, `park`, `zoo` or `water` |
+| `category` | string | required: `pharmacy`, `mall`, `park`, `zoo`, `water`, `hospital`, `culture`, `sports`, `fuel`, `ice_cream` or `transit` |
 | `alternateName` | string | name in another language or script |
 | `address` | string | required, max 200 |
 | `neighborhood` | string | required, max 80 |
@@ -97,6 +135,10 @@ To use your own data, replace the JSON file (same fields as the `POST` body) and
 | `hours` | string | free text, line breaks are kept |
 | `rating` | number | 0 to 5 |
 | `tags` | string[] | up to 20, max 40 chars each |
+| `source` | string | `osm` or `manual` |
+| `osmId` | string | OSM element, like `node/3897495209`; unique |
+| `seenAt` | date | last sync that saw it |
+| `stale` | boolean | gone from OSM; hidden from lists |
 | `createdAt`, `updatedAt` | date | automatic |
 
 GeoJSON puts longitude first. The API accepts `lat`/`lng` and builds `[lng, lat]` for you.
@@ -106,9 +148,7 @@ GeoJSON puts longitude first. The API accepts `lat`/`lng` and builds `[lng, lat]
 1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas).
 2. Create a database user and copy the connection string (`mongodb+srv://user:pass@cluster.xxxx.mongodb.net/place-finder`).
 3. Under **Network Access**, allow your IP for local development. Vercel functions do not have fixed IPs, so production needs `0.0.0.0/0` (or Vercel's paid static IPs).
-4. Put the string in `.env.local` as `MONGODB_URI` and run `npm run seed -- --replace`. The seed also creates the 2dsphere index.
-
-The seed deletes every document in `places` before inserting, which is why it refuses to run without `--replace`. Never point it at production data.
+4. Put the string in `.env.local` as `MONGODB_URI` and run `npm run sync`. It also creates the indexes.
 
 ## Deploy on Vercel
 
@@ -116,8 +156,9 @@ The seed deletes every document in `places` before inserting, which is why it re
 
 1. Push the repo to GitHub and import it at [vercel.com/new](https://vercel.com/new), or run `npx vercel` in the project folder.
 2. In **Settings → Environment Variables**, add `MONGODB_URI`. Alternatively, `npx vercel integration add mongodbatlas --plan FREE` creates a free Atlas cluster and sets the variable for you.
-3. Seed it: `npx vercel env pull .env.production.local --environment production`, then `node --env-file=.env.production.local server/seed.js --replace`.
-4. Deploy, then check `https://<your-app>.vercel.app/api/health` returns `{"status":"ok"}` and that reloading a `/place/<id>` URL shows the page.
+3. Add `CRON_SECRET` (any long random string, e.g. `openssl rand -hex 32`) and, if you want to add places by hand, `ADMIN_TOKEN`.
+4. Fill the database once so the site is not empty until the first cron: `npx vercel env pull .env.production.local --environment production`, then `node --env-file=.env.production.local server/sync-cli.js`.
+5. Deploy, then check `https://<your-app>.vercel.app/api/health` returns `{"status":"ok"}` and that reloading a `/place/<id>` URL shows the page.
 
 The Node version comes from `engines.node` in `package.json` (22.x).
 
@@ -129,7 +170,7 @@ Tiles come from the public OpenStreetMap servers, which is fine for a demo or lo
 
 **`/api/health` returns 503.** `MONGODB_URI` is missing or the database is unreachable. Locally, the API reads `.env.local` at start, so restart `npm run dev:api` after editing it. On Atlas, check Network Access.
 
-**The list is empty.** Run the seed, then check the radius and the category filter: the demo data is in São José do Rio Preto, so with a real location elsewhere nothing will be within 50 km. Deny location or add places near you.
+**The list is empty.** Run `npm run sync`, then check the radius and the category filter: the demo data is in São José do Rio Preto, so with a real location elsewhere nothing will be within 50 km. Deny location or add places near you.
 
 **Location never resolves.** Browsers only allow geolocation on `https` or `localhost`. Opening the dev server through a LAN IP will always fall back to the demo location.
 
@@ -139,16 +180,15 @@ Tiles come from the public OpenStreetMap servers, which is fine for a demo or lo
 
 ## Adding places
 
-There is no admin screen. Use the API:
+For places that are not in OpenStreetMap. There is no admin screen; set `ADMIN_TOKEN` and use the API:
 
 ```bash
 curl -X POST http://localhost:3001/api/places \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"category":"pharmacy","name":"New Pharmacy","address":"789 Main St","neighborhood":"Centro","city":"São José do Rio Preto","lat":-20.82,"lng":-49.38,"tags":["Parking"]}'
 ```
 
-The endpoint has no authentication. Before a public deploy, protect it or remove it from `server/places.js`.
-
 ## What is not here
 
-Authentication, image uploads, reviews, notifications and analytics were left out on purpose. Each one is a separate feature with its own decisions; add them when there is a need for them.
+User accounts, image uploads, reviews, notifications and analytics were left out on purpose. Each one is a separate feature with its own decisions; add them when there is a need for them.

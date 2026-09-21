@@ -2,6 +2,7 @@ import { Router } from 'express';
 import mongoose from 'mongoose';
 import Place from './place.js';
 import { connect } from './db.js';
+import { requireBearer } from './auth.js';
 import {
   category, latitude, longitude, radiusKm, positiveInt, searchTerm, escapeRegex, placeInput, distanceKm,
 } from './validation.js';
@@ -27,6 +28,7 @@ router.get('/nearby', async (req, res) => {
   const kind = category(req.query.category);
 
   const places = await Place.find({
+    stale: { $ne: true },
     ...(kind && { category: kind }),
     location: {
       $near: {
@@ -50,6 +52,7 @@ router.get('/search', async (req, res) => {
     : null;
   const kind = category(req.query.category);
   const places = await Place.find({
+    stale: { $ne: true },
     ...(kind && { category: kind }),
     $or: ['name', 'alternateName', 'neighborhood', 'city'].map((field) => ({ [field]: pattern })),
   })
@@ -67,14 +70,14 @@ router.get('/', async (req, res) => {
   const limit = positiveInt(req.query.limit, 'limit', 20, 100);
 
   const [total, data] = await Promise.all([
-    Place.countDocuments(),
-    Place.find().sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+    Place.countDocuments({ stale: { $ne: true } }),
+    Place.find({ stale: { $ne: true } }).sort({ createdAt: -1, _id: -1 }).skip((page - 1) * limit).limit(limit).lean(),
   ]);
 
   res.json({ data, count: data.length, total, page, pages: Math.ceil(total / limit) });
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireBearer('ADMIN_TOKEN'), async (req, res) => {
   const place = await Place.create(placeInput(req.body));
   res.status(201).json({ data: place });
 });

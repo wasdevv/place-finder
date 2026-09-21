@@ -2,6 +2,8 @@ import express from 'express';
 import mongoose from 'mongoose';
 import places from './places.js';
 import { connect } from './db.js';
+import { requireBearer } from './auth.js';
+import { sync } from './sync.js';
 
 const app = express();
 
@@ -12,6 +14,11 @@ app.get('/api/health', async (req, res) => {
   await connect();
   await mongoose.connection.db.admin().ping();
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+app.get('/api/sync', requireBearer('CRON_SECRET'), async (req, res) => {
+  await connect();
+  res.json(await sync({ lookupLimit: 40 }));
 });
 
 app.use('/api/places', places);
@@ -28,7 +35,9 @@ app.use((error, req, res, next) => {
     console.error(error);
     return res.status(503).json({ error: 'Database unavailable' });
   }
-  if (error.status >= 400 && error.status < 500) return res.status(error.status).json({ error: error.message });
+  if ((error.status >= 400 && error.status < 500) || error.status === 502) {
+    return res.status(error.status).json({ error: error.message });
+  }
   console.error(error);
   res.status(500).json({ error: 'Internal server error' });
 });

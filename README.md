@@ -2,7 +2,7 @@
 
 Find places near you on a map. A list of nearby places on the left, an OpenStreetMap map on the right, a detail page with directions for each one.
 
-It ships with real places in São José do Rio Preto, Brazil: pharmacies, malls, parks, the zoo, rivers and lakes. Categories, city and branding live in one config file, so it works for anything with a name and a coordinate.
+It maps real places in São José do Rio Preto, Brazil, and keeps them current with a daily sync from OpenStreetMap: pharmacies, malls, parks, the zoo, rivers and lakes, hospitals, museums and theaters, stadiums, gas stations, ice cream shops and bus stations. Categories, city and branding live in one config file, so it works for anything with a name and a coordinate.
 
 **Live:** https://place-finder-five.vercel.app
 
@@ -17,9 +17,10 @@ It ships with real places in São José do Rio Preto, Brazil: pharmacies, malls,
 - Map with a radius circle, your position and a marker per place
 - Detail page with address, phone, website, hours, tags and a Google Maps directions link
 - Responsive down to phone width
-- JSON API with validated input, including an open `POST` for adding places
+- Daily sync with OpenStreetMap through Vercel Cron: new places appear, changed ones update, removed ones are hidden
+- JSON API with validated input; adding places by hand needs an admin token
 
-Demo data comes from [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL).
+Place data comes from [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL).
 
 ## Stack
 
@@ -32,7 +33,7 @@ Requires Node 22 and a MongoDB database (Atlas free tier or local).
 ```bash
 npm install
 cp .env.example .env.local        # set MONGODB_URI
-npm run seed -- --replace         # wipes the places collection and inserts demo data
+npm run sync                      # pulls places from OpenStreetMap (a few minutes the first time)
 npm run dev:api                   # http://localhost:3001
 npm run dev:web                   # http://localhost:5173
 ```
@@ -40,7 +41,7 @@ npm run dev:web                   # http://localhost:5173
 No MongoDB around? `docker run -d -p 27017:27017 mongo:7` and use `MONGODB_URI=mongodb://127.0.0.1:27017/place-finder`.
 
 ```bash
-npm test          # validation tests (node:test)
+npm test          # validation and OSM mapping tests (node:test)
 npm run check     # tests + production build
 ```
 

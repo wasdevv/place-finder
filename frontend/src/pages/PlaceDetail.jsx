@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Globe, MapPin, Navigation, Phone, Star } from 'lucide-react';
+import { ArrowLeft, Clock, ExternalLink, Globe, MapPin, Navigation, Phone, Star } from 'lucide-react';
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import Brand from '../components/Brand.jsx';
 import { getPlace } from '../api.js';
@@ -113,6 +113,16 @@ export default function PlaceDetail() {
                   Get directions
                 </a>
               </>
+            )}
+
+            {place.osmId && (
+              <p className="source muted">
+                Data from OpenStreetMap, updated daily.{' '}
+                <a href={`https://www.openstreetmap.org/${place.osmId}`} target="_blank" rel="noopener noreferrer">
+                  Fix it on OpenStreetMap
+                  <ExternalLink size={12} aria-hidden="true" />
+                </a>
+              </p>
             )}
           </article>
         )}
