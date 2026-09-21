@@ -1,0 +1,33 @@
+{
+  "name": "place-finder",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "dev:api": "node --env-file-if-exists=.env.local server/dev.js",
+    "dev:web": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "seed": "node --env-file-if-exists=.env.local server/seed.js",
+    "test": "node --test server/*.test.js",
+    "check": "npm test && npm run build"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^1.47.0",
+    "mongoose": "^9.10.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.18.4"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.1",
+    "vite": "^8.3.0"
+  }
+}
