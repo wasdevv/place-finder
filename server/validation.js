@@ -25,6 +25,14 @@ export function longitude(value) {
   return n;
 }
 
+export const CATEGORIES = ['pharmacy', 'mall', 'park', 'zoo', 'water'];
+
+export function category(value) {
+  if (value === undefined || value === '') return undefined;
+  if (!CATEGORIES.includes(value)) fail(`category must be one of ${CATEGORIES.join(', ')}`);
+  return value;
+}
+
 export const MAX_RADIUS_KM = 50;
 
 export function radiusKm(value) {
@@ -67,6 +75,7 @@ export function placeInput(body) {
 
   const place = {
     name: text(body.name, 'name', 120, true),
+    category: category(body.category) ?? fail('category is required'),
     alternateName: text(body.alternateName, 'alternateName', 120),
     address: text(body.address, 'address', 200, true),
     neighborhood: text(body.neighborhood, 'neighborhood', 80, true),

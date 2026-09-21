@@ -21,27 +21,27 @@ All responses are JSON. Errors are `{ "error": "message" }` with a 4xx or 5xx st
 | `lat` | yes | -90 to 90 |
 | `lng` | yes | -180 to 180 |
 | `radiusKm` | no | greater than 0, at most 50, default 5 |
+| `category` | no | `pharmacy`, `mall`, `park`, `zoo` or `water` |
 
-Up to 50 places, closest first, each with `distance` in km.
+Up to 100 places, closest first, each with `distance` in km.
 
 ```json
 {
   "data": [
     {
-      "_id": "6ab15d851c255882a50adf74",
-      "name": "Nabipura Family Chemist",
-      "alternateName": "نبی پورہ فیملی کیمسٹ",
-      "address": "18 Gurumangat Road",
-      "neighborhood": "Nabipura",
-      "city": "Lahore",
-      "location": { "type": "Point", "coordinates": [74.3598, 31.522] },
-      "phone": "+92 42 3576 5500",
-      "hours": "Daily: 8am–midnight",
-      "rating": 3.9,
-      "tags": ["Delivery"],
-      "createdAt": "2026-09-21T16:38:29.512Z",
-      "updatedAt": "2026-09-21T16:38:29.512Z",
-      "distance": 0.21
+      "_id": "6ab16517a8f9bda8696f0e70",
+      "name": "Farmácia Central",
+      "category": "pharmacy",
+      "address": "Rua Bernardino de Campos, 3568",
+      "neighborhood": "Vila Redentora",
+      "city": "São José do Rio Preto",
+      "location": { "type": "Point", "coordinates": [-49.384734, -20.814963] },
+      "phone": "+55 17 2139-7999",
+      "hours": "Open 24 hours",
+      "tags": ["24h"],
+      "createdAt": "2026-09-21T17:10:47.533Z",
+      "updatedAt": "2026-09-21T17:10:47.533Z",
+      "distance": 0.57
     }
   ],
   "count": 1,
@@ -55,6 +55,7 @@ Up to 50 places, closest first, each with `distance` in km.
 |---|---|---|
 | `q` | yes | 1 to 100 characters after trimming, matched as plain text |
 | `lat`, `lng` | no | when both are sent, each result gets `distance` |
+| `category` | no | same values as nearby |
 
 Case-insensitive match on `name`, `alternateName`, `neighborhood` and `city`. Up to 50 results sorted by name. Same response shape as nearby, without `radiusKm`.
 
@@ -81,19 +82,20 @@ No authentication.
 
 ```json
 {
+  "category": "pharmacy",
   "name": "New Pharmacy",
   "address": "789 Main St",
-  "neighborhood": "Gulberg",
-  "city": "Lahore",
-  "lat": 31.5204,
-  "lng": 74.3587,
-  "alternateName": "نئی فارمیسی",
-  "phone": "+92 42 0000 0000",
+  "neighborhood": "Centro",
+  "city": "São José do Rio Preto",
+  "lat": -20.8165,
+  "lng": -49.3795,
+  "alternateName": "Farmácia Nova",
+  "phone": "(17) 3000-0000",
   "website": "https://example.com",
-  "hours": "Mon–Sun: 9am–9pm",
+  "hours": "Todos os dias: 9h–21h",
   "rating": 4.2,
-  "tags": ["Parking", "AC"]
+  "tags": ["Estacionamento", "Entrega"]
 }
 ```
 
-`name`, `address`, `neighborhood`, `city`, `lat` and `lng` are required. `rating` must be a JSON number from 0 to 5. `tags` must be an array of non-empty strings. Any other field is ignored. Returns `201 { "data": { ... } }`.
+`category`, `name`, `address`, `neighborhood`, `city`, `lat` and `lng` are required. `rating` must be a JSON number from 0 to 5. `tags` must be an array of non-empty strings. Any other field is ignored. Returns `201 { "data": { ... } }`.

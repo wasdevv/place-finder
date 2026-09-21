@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  ValidationError, latitude, longitude, radiusKm, positiveInt, searchTerm, escapeRegex, placeInput, distanceKm,
+  ValidationError, category, latitude, longitude, radiusKm, positiveInt, searchTerm, escapeRegex, placeInput, distanceKm,
 } from './validation.js';
 
-const base = { name: 'A', address: 'B', neighborhood: 'C', city: 'D', lat: 0, lng: 0 };
+const base = { name: 'A', category: 'mall', address: 'B', neighborhood: 'C', city: 'D', lat: 0, lng: 0 };
 
 test('coordinates accept zero and reject out of range or non-finite', () => {
   assert.equal(latitude('0'), 0);
@@ -35,8 +35,8 @@ test('search term is trimmed and regex is treated as text', () => {
 });
 
 test('place input keeps only allowed fields and orders coordinates as [lng, lat]', () => {
-  const place = placeInput({ ...base, lat: 31.5, lng: 74.3, rating: 0, tags: [' AC '], _id: 'x', isAdmin: true });
-  assert.deepEqual(place.location, { type: 'Point', coordinates: [74.3, 31.5] });
+  const place = placeInput({ ...base, lat: -20.8, lng: -49.3, rating: 0, tags: [' AC '], _id: 'x', isAdmin: true });
+  assert.deepEqual(place.location, { type: 'Point', coordinates: [-49.3, -20.8] });
   assert.equal(place.rating, 0);
   assert.deepEqual(place.tags, ['AC']);
   assert.equal(place._id, undefined);
@@ -51,6 +51,14 @@ test('place input rejects invalid values', () => {
     assert.throws(() => placeInput({ ...base, ...patch }), ValidationError, JSON.stringify(patch));
   }
   assert.throws(() => placeInput([]), ValidationError);
+  assert.throws(() => placeInput({ ...base, category: undefined }), ValidationError);
+  assert.throws(() => placeInput({ ...base, category: 'casino' }), ValidationError);
+});
+
+test('category filter is optional but must be known', () => {
+  assert.equal(category(''), undefined);
+  assert.equal(category('zoo'), 'zoo');
+  assert.throws(() => category('__proto__'), ValidationError);
 });
 
 test('haversine distance', () => {

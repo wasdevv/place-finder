@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
+import { CATEGORIES } from './validation.js';
 
 const str = (maxlength, required = false) => ({ type: String, trim: true, maxlength, required });
 
 const placeSchema = new mongoose.Schema(
   {
     name: str(120, true),
+    category: { type: String, enum: CATEGORIES, required: true, index: true },
     alternateName: str(120),
     address: str(200, true),
     neighborhood: str(80, true),

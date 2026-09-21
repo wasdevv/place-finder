@@ -4,25 +4,22 @@ import { Circle, MapContainer, Marker, TileLayer, Tooltip, ZoomControl, useMap }
 import { flushSync } from 'react-dom';
 import { createRoot } from 'react-dom/client';
 import L from 'leaflet';
-import { brand } from '../config.js';
+import { categories, categoryOf } from '../config.js';
 import { coordsOf } from '../format.js';
 
-function iconMarkup() {
+function pin({ Icon, color }) {
   const container = document.createElement('span');
   const root = createRoot(container);
-  flushSync(() => root.render(<brand.Icon size={18} color="#fff" />));
-  const markup = container.innerHTML;
+  flushSync(() => root.render(<Icon size={18} color="#fff" />));
+  const html = `<span class="pin-head" style="--cat:${color}"><span>${container.innerHTML}</span></span>`;
   root.unmount();
-  return markup;
+  return L.divIcon({ className: 'pin', html, iconSize: [44, 54], iconAnchor: [22, 54], tooltipAnchor: [0, -50] });
 }
 
-export const placeIcon = L.divIcon({
-  className: 'pin',
-  html: `<span class="pin-head"><span>${iconMarkup()}</span></span>`,
-  iconSize: [44, 54],
-  iconAnchor: [22, 54],
-  tooltipAnchor: [0, -50],
-});
+const pins = Object.fromEntries(Object.keys(categories).map((key) => [key, pin(categories[key])]));
+const fallbackPin = pin(categoryOf());
+
+export const pinFor = (key) => pins[key] ?? fallbackPin;
 
 export const tiles = {
   url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
@@ -77,7 +74,7 @@ export default function PlaceMap({ places, origin, radius, fitPlaces, layoutKey 
         <Marker
           key={place._id}
           position={coords}
-          icon={placeIcon}
+          icon={pinFor(place.category)}
           title={place.name}
           eventHandlers={{ click: () => navigate(`/place/${place._id}`) }}
         >

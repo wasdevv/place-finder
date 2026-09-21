@@ -2,7 +2,7 @@
 
 Find places near you on a map. A list of nearby places on the left, an OpenStreetMap map on the right, a detail page with directions for each one.
 
-It ships configured for pharmacies in Lahore, but the kind of place is one config file away: pharmacies, bike racks, recycling points, anything with a name and a coordinate.
+It ships with real places in São José do Rio Preto, Brazil: pharmacies, malls, parks, the zoo, rivers and lakes. Categories, city and branding live in one config file, so it works for anything with a name and a coordinate.
 
 ![Place Finder](docs/screenshot.jpg)
 
@@ -11,10 +11,13 @@ It ships configured for pharmacies in Lahore, but the kind of place is one confi
 - Nearby search with your browser location and a radius from 1 to 50 km, sorted by distance
 - Falls back to a demo location when location is denied or unavailable, and says so
 - Text search by name, alternate name, neighborhood or city
+- Category filter, with its own color and icon on the list and on the map
 - Map with a radius circle, your position and a marker per place
 - Detail page with address, phone, website, hours, tags and a Google Maps directions link
 - Responsive down to phone width
 - JSON API with validated input, including an open `POST` for adding places
+
+Demo data comes from [OpenStreetMap](https://www.openstreetmap.org/copyright) (© OpenStreetMap contributors, ODbL).
 
 ## Stack
 

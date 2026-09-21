@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
 import { ChevronRight, MapPin, Navigation, Star } from 'lucide-react';
-import { brand } from '../config.js';
+import { brand, categories, categoryOf } from '../config.js';
 import { formatKm, isNumber } from '../format.js';
 
-export default function PlaceList({ places, subtitle, loading, error, query }) {
+export default function PlaceList({ places, subtitle, loading, error, query, category, onCategoryChange }) {
   return (
     <aside className="sidebar" aria-busy={loading}>
       <div className="sidebar-head">
@@ -15,6 +15,20 @@ export default function PlaceList({ places, subtitle, loading, error, query }) {
           <MapPin size={14} aria-hidden="true" />
           {subtitle}
         </p>
+        <div className="chips" role="group" aria-label="Filter by category">
+          {[['', 'All'], ...Object.entries(categories).map(([key, { label }]) => [key, label])].map(([key, label]) => (
+            <button
+              key={key || 'all'}
+              type="button"
+              className="chip"
+              aria-pressed={category === key}
+              style={key ? { '--cat': categories[key].color } : undefined}
+              onClick={() => onCategoryChange(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && <p className="sidebar-message error" role="alert">{error}</p>}
@@ -26,42 +40,45 @@ export default function PlaceList({ places, subtitle, loading, error, query }) {
       )}
 
       <ul className="cards">
-        {places.map((place) => (
-          <li key={place._id}>
-            <Link to={`/place/${place._id}`} className="card">
-              <span className="card-icon" aria-hidden="true"><brand.Icon size={20} /></span>
-              <span className="card-body">
-                <span className="card-title">{place.name}</span>
-                {place.alternateName && <span className="card-alt" dir="auto">{place.alternateName}</span>}
-                <span className="muted">{[place.neighborhood, place.city].filter(Boolean).join(', ')}</span>
-                {(isNumber(place.distance) || isNumber(place.rating)) && (
-                  <span className="card-meta">
-                    {isNumber(place.distance) && (
-                      <span className="distance">
-                        <Navigation size={13} aria-hidden="true" />
-                        {formatKm(place.distance)}
-                      </span>
-                    )}
-                    {isNumber(place.rating) && (
-                      <span className="rating">
-                        <Star size={13} aria-hidden="true" />
-                        {place.rating.toFixed(1)}
-                      </span>
-                    )}
-                  </span>
-                )}
-                {place.tags?.length > 0 && (
-                  <span className="tags">
-                    {place.tags.slice(0, 3).map((tag, i) => (
-                      <span key={tag} className={`tag tag-${i}`}>{tag}</span>
-                    ))}
-                  </span>
-                )}
-              </span>
-              <ChevronRight size={18} className="card-chevron" aria-hidden="true" />
-            </Link>
-          </li>
-        ))}
+        {places.map((place) => {
+          const { Icon, color, label } = categoryOf(place.category);
+          return (
+            <li key={place._id}>
+              <Link to={`/place/${place._id}`} className="card" style={{ '--cat': color }}>
+                <span className="card-icon" aria-hidden="true"><Icon size={20} /></span>
+                <span className="card-body">
+                  <span className="card-title">{place.name}</span>
+                  {place.alternateName && <span className="card-alt" dir="auto">{place.alternateName}</span>}
+                  <span className="muted">{[label, place.neighborhood].filter(Boolean).join(' · ')}</span>
+                  {(isNumber(place.distance) || isNumber(place.rating)) && (
+                    <span className="card-meta">
+                      {isNumber(place.distance) && (
+                        <span className="distance">
+                          <Navigation size={13} aria-hidden="true" />
+                          {formatKm(place.distance)}
+                        </span>
+                      )}
+                      {isNumber(place.rating) && (
+                        <span className="rating">
+                          <Star size={13} aria-hidden="true" />
+                          {place.rating.toFixed(1)}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                  {place.tags?.length > 0 && (
+                    <span className="tags">
+                      {place.tags.slice(0, 3).map((tag, i) => (
+                        <span key={tag} className={`tag tag-${i}`}>{tag}</span>
+                      ))}
+                    </span>
+                  )}
+                </span>
+                <ChevronRight size={18} className="card-chevron" aria-hidden="true" />
+              </Link>
+            </li>
+          );
+        })}
       </ul>
     </aside>
   );

@@ -12,6 +12,7 @@ export default function Home() {
   const [origin, setOrigin] = useState(demoOrigin);
   const [radius, setRadius] = useState(defaultRadius);
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('');
   const [places, setPlaces] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,8 +50,8 @@ export default function Home() {
     setError('');
 
     const request = query
-      ? searchPlaces(query, lat, lng, controller.signal)
-      : getNearby(lat, lng, radius, controller.signal);
+      ? searchPlaces(query, lat, lng, category, controller.signal)
+      : getNearby(lat, lng, radius, category, controller.signal);
 
     request
       .then((body) => setPlaces(body.data))
@@ -62,7 +63,7 @@ export default function Home() {
       });
 
     return () => controller.abort();
-  }, [origin, radius, query]);
+  }, [origin, radius, query, category]);
 
   const where = origin.demo ? `${demoLocation.city} (demo)` : 'your location';
   const subtitle = query ? `Matches for “${query}”` : `Within ${radius} km of ${where}`;
@@ -88,7 +89,15 @@ export default function Home() {
       )}
 
       <main className="layout">
-        <PlaceList places={places} subtitle={subtitle} loading={loading} error={error} query={query} />
+        <PlaceList
+          places={places}
+          subtitle={subtitle}
+          loading={loading}
+          error={error}
+          query={query}
+          category={category}
+          onCategoryChange={setCategory}
+        />
         <section className="map-wrap" aria-label="Map">
           <PlaceMap
             places={places}

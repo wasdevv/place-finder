@@ -21,10 +21,11 @@ server/
   validation.js         Input parsing and validation, Haversine distance
   validation.test.js    Tests for validation.js
   seed.js               Demo data loader
+  seed-places.json      Demo places (from OpenStreetMap)
 frontend/
   index.html
   src/
-    config.js           Brand, kind of place, demo location, radius options
+    config.js           Brand, categories, demo location, radius options
     api.js              fetch wrapper
     format.js           Coordinate and distance helpers
     pages/Home.jsx      Location, radius, search and results state
@@ -44,7 +45,7 @@ Vercel turns every file under `api/` into its own serverless function. Keeping `
 - **Connection** (`db.js`): the connection promise is kept in module scope so warm serverless invocations reuse it. A failed connection clears the promise so the next request retries instead of failing forever. A missing `MONGODB_URI` or an unreachable database becomes a `503 Database unavailable`, never a stack trace.
 - **Validation** (`validation.js`): every query parameter and the `POST` body pass through pure functions that throw a 400 `ValidationError`. The body is rebuilt from an allowlist, so unknown fields (`_id`, `createdAt`, anything else) never reach the database. Zero is a valid coordinate and a valid rating; the checks use `Number.isFinite`, not truthiness.
 - **Search** escapes regex metacharacters, so `.*` or `[` are searched as text. A case-insensitive regex is fine for a few thousand documents; past that, move to Atlas Search.
-- **Nearby** uses `$near` on the 2dsphere index, which already returns results sorted by distance, then adds `distance` in km with the Haversine formula. Search results get `distance` too when the client sends `lat`/`lng`.
+- **Nearby** uses `$near` on the 2dsphere index, which already returns the closest 100 sorted by distance, then adds `distance` in km with the Haversine formula. Search results get `distance` too when the client sends `lat`/`lng`.
 - **Errors** (`app.js`): malformed JSON is 400, bodies over 10 kB are 413, validation is 400, database problems are 503 and anything else is a generic 500 that is logged but not exposed.
 
 ### Frontend
@@ -52,36 +53,40 @@ Vercel turns every file under `api/` into its own serverless function. Keeping `
 - `Home.jsx` owns all state. It shows the demo location first so the page is never empty, asks for the browser location on load and switches to it when granted. If location is denied, unsupported or times out, a dismissible notice says the demo location is being used. **My Location** asks again.
 - Each fetch runs in an effect keyed on location, radius and search term, with an `AbortController`, so a slow response never overwrites a newer one. A failed request keeps the last good list and shows the error.
 - Clearing the search box returns to the nearby list.
+- The category chips filter both nearby and search results on the server (`category` query parameter).
 - `PlaceMap.jsx` fits the map to the radius circle in nearby mode and to the results in search mode. `MapContainer` only reads `center` on creation, so a small child component with `useMap` moves the view when data changes and calls `invalidateSize` when the notice bar changes the map height.
-- Map markers are Leaflet `divIcon`s styled in CSS, with the same Lucide icon used in the list, so no marker images are hotlinked.
+- Map markers are Leaflet `divIcon`s styled in CSS, one per category with the same Lucide icon and color used in the list, so no marker images are hotlinked. They are built once when the module loads, because rendering the icon markup inside a React render does nothing.
 - Places with missing or malformed coordinates are skipped on the map instead of breaking the list.
 
 ## Customizing
 
-Everything about the kind of place is in `frontend/src/config.js`:
+Branding, categories and the demo location are in `frontend/src/config.js`:
 
 ```js
-import { Bike } from 'lucide-react';
+import { Bike, Recycle } from 'lucide-react';
 
-export const brand = {
-  name: 'Bike Finder',
-  tagline: 'Racks and repair stations nearby',
-  Icon: Bike,
-  singular: 'bike rack',
-  plural: 'bike racks',
-  title: 'Nearby Bike Racks',
+export const categories = {
+  bike: { label: 'Bike racks', Icon: Bike, color: '#0f9d7a' },
+  recycling: { label: 'Recycling', Icon: Recycle, color: '#15803d' },
 };
 
 export const demoLocation = { lat: -23.5505, lng: -46.6333, city: 'São Paulo' };
 ```
 
-`Icon` is any [Lucide](https://lucide.dev/icons) icon. Colors are CSS variables at the top of `styles.css`. Replace the demo data in `server/seed.js` and run `npm run seed -- --replace`.
+`Icon` is any [Lucide](https://lucide.dev/icons) icon. A category key must also be in `CATEGORIES` in `server/validation.js`, which the schema and the API use to reject unknown values. Other colors are CSS variables at the top of `styles.css`.
+
+## Demo data
+
+`server/seed-places.json` holds 71 real places in São José do Rio Preto taken from OpenStreetMap: 46 pharmacies, 10 malls, 11 parks, the zoo, the Represa Municipal, a lake and a point on the Rio Preto. Coordinates, names, street addresses, phones and opening hours come from OSM tags; missing street names and the neighborhoods come from Nominatim reverse geocoding. OSM data is © OpenStreetMap contributors under the [ODbL](https://www.openstreetmap.org/copyright), which the map attribution already credits.
+
+To use your own data, replace the JSON file (same fields as the `POST` body) and run `npm run seed -- --replace`.
 
 ## Data model
 
 | Field | Type | Notes |
 |---|---|---|
 | `name` | string | required, max 120 |
+| `category` | string | required: `pharmacy`, `mall`, `park`, `zoo` or `water` |
 | `alternateName` | string | name in another language or script |
 | `address` | string | required, max 200 |
 | `neighborhood` | string | required, max 80 |
@@ -123,7 +128,7 @@ Tiles come from the public OpenStreetMap servers, which is fine for a demo or lo
 
 **`/api/health` returns 503.** `MONGODB_URI` is missing or the database is unreachable. Locally, the API reads `.env.local` at start, so restart `npm run dev:api` after editing it. On Atlas, check Network Access.
 
-**The list is empty.** Run the seed, then check the radius: the demo data is in Lahore, so with a real location elsewhere nothing will be within 50 km. Deny location or add places near you.
+**The list is empty.** Run the seed, then check the radius and the category filter: the demo data is in São José do Rio Preto, so with a real location elsewhere nothing will be within 50 km. Deny location or add places near you.
 
 **Location never resolves.** Browsers only allow geolocation on `https` or `localhost`. Opening the dev server through a LAN IP will always fall back to the demo location.
 
@@ -138,7 +143,7 @@ There is no admin screen. Use the API:
 ```bash
 curl -X POST http://localhost:3001/api/places \
   -H 'Content-Type: application/json' \
-  -d '{"name":"New Pharmacy","address":"789 Main St","neighborhood":"Gulberg","city":"Lahore","lat":31.52,"lng":74.35,"tags":["Parking"]}'
+  -d '{"category":"pharmacy","name":"New Pharmacy","address":"789 Main St","neighborhood":"Centro","city":"São José do Rio Preto","lat":-20.82,"lng":-49.38,"tags":["Parking"]}'
 ```
 
 The endpoint has no authentication. Before a public deploy, protect it or remove it from `server/places.js`.

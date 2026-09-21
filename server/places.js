@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import Place from './place.js';
 import { connect } from './db.js';
 import {
-  latitude, longitude, radiusKm, positiveInt, searchTerm, escapeRegex, placeInput, distanceKm,
+  category, latitude, longitude, radiusKm, positiveInt, searchTerm, escapeRegex, placeInput, distanceKm,
 } from './validation.js';
 
 const router = Router();
@@ -24,7 +24,10 @@ router.get('/nearby', async (req, res) => {
   const lng = longitude(req.query.lng);
   const radius = radiusKm(req.query.radiusKm);
 
+  const kind = category(req.query.category);
+
   const places = await Place.find({
+    ...(kind && { category: kind }),
     location: {
       $near: {
         $geometry: { type: 'Point', coordinates: [lng, lat] },
@@ -32,7 +35,7 @@ router.get('/nearby', async (req, res) => {
       },
     },
   })
-    .limit(50)
+    .limit(100)
     .lean();
 
   const data = withDistance(places, lat, lng);
@@ -45,7 +48,9 @@ router.get('/search', async (req, res) => {
   const origin = req.query.lat !== undefined && req.query.lng !== undefined
     ? [latitude(req.query.lat), longitude(req.query.lng)]
     : null;
+  const kind = category(req.query.category);
   const places = await Place.find({
+    ...(kind && { category: kind }),
     $or: ['name', 'alternateName', 'neighborhood', 'city'].map((field) => ({ [field]: pattern })),
   })
     .sort({ name: 1, _id: 1 })

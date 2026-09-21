@@ -4,9 +4,9 @@ import { ArrowLeft, Clock, Globe, MapPin, Navigation, Phone, Star } from 'lucide
 import { MapContainer, Marker, TileLayer } from 'react-leaflet';
 import Brand from '../components/Brand.jsx';
 import { getPlace } from '../api.js';
-import { brand } from '../config.js';
+import { brand, categoryOf } from '../config.js';
 import { coordsOf, isNumber } from '../format.js';
-import { placeIcon, tiles } from '../components/PlaceMap.jsx';
+import { pinFor, tiles } from '../components/PlaceMap.jsx';
 
 export default function PlaceDetail() {
   const { id } = useParams();
@@ -27,6 +27,7 @@ export default function PlaceDetail() {
 
   const { place, loading, error } = state;
   const coords = coordsOf(place);
+  const { Icon, color, label } = categoryOf(place?.category);
 
   return (
     <div className="detail-page">
@@ -44,10 +45,11 @@ export default function PlaceDetail() {
         {error && <p className="panel error" role="alert">{error}</p>}
 
         {place && (
-          <article className="panel detail-card">
+          <article className="panel detail-card" style={{ '--cat': color }}>
             <div className="detail-head">
-              <span className="card-icon card-icon-lg" aria-hidden="true"><brand.Icon size={30} /></span>
+              <span className="card-icon card-icon-lg" aria-hidden="true"><Icon size={30} /></span>
               <div>
+                <span className="category">{label}</span>
                 <h1>{place.name}</h1>
                 {place.alternateName && <p className="card-alt" dir="auto">{place.alternateName}</p>}
                 {isNumber(place.rating) && (
@@ -99,7 +101,7 @@ export default function PlaceDetail() {
               <>
                 <MapContainer center={coords} zoom={16} className="detail-map" scrollWheelZoom={false}>
                   <TileLayer {...tiles} />
-                  <Marker position={coords} icon={placeIcon} />
+                  <Marker position={coords} icon={pinFor(place.category)} />
                 </MapContainer>
                 <a
                   className="btn btn-primary btn-block"
