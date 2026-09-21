@@ -9,7 +9,7 @@ export function connect() {
     return Promise.reject(error);
   }
   connection ??= mongoose
-    .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
+    .connect(process.env.MONGODB_URI, { dbName: 'place-finder', serverSelectionTimeoutMS: 5000 })
     .catch((error) => {
       connection = undefined;
       error.status = 503;

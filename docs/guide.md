@@ -42,7 +42,7 @@ Vercel turns every file under `api/` into its own serverless function. Keeping `
 
 ### Backend
 
-- **Connection** (`db.js`): the connection promise is kept in module scope so warm serverless invocations reuse it. A failed connection clears the promise so the next request retries instead of failing forever. A missing `MONGODB_URI` or an unreachable database becomes a `503 Database unavailable`, never a stack trace.
+- **Connection** (`db.js`): the connection promise is kept in module scope so warm serverless invocations reuse it. A failed connection clears the promise so the next request retries instead of failing forever. A missing `MONGODB_URI` or an unreachable database becomes a `503 Database unavailable`, never a stack trace. The database name is always `place-finder`, whatever path the URI has, so an Atlas string without a database (like the one the Vercel integration creates) does not fall into Mongo's default `test` database.
 - **Validation** (`validation.js`): every query parameter and the `POST` body pass through pure functions that throw a 400 `ValidationError`. The body is rebuilt from an allowlist, so unknown fields (`_id`, `createdAt`, anything else) never reach the database. Zero is a valid coordinate and a valid rating; the checks use `Number.isFinite`, not truthiness.
 - **Search** escapes regex metacharacters, so `.*` or `[` are searched as text. A case-insensitive regex is fine for a few thousand documents; past that, move to Atlas Search.
 - **Nearby** uses `$near` on the 2dsphere index, which already returns the closest 100 sorted by distance, then adds `distance` in km with the Haversine formula. Search results get `distance` too when the client sends `lat`/`lng`.
@@ -115,8 +115,9 @@ The seed deletes every document in `places` before inserting, which is why it re
 `vercel.json` sets the Vite build, `dist/` as output, `/api/*` to the Express function and every other path to `index.html`, so a reload on `/place/:id` still works.
 
 1. Push the repo to GitHub and import it at [vercel.com/new](https://vercel.com/new), or run `npx vercel` in the project folder.
-2. In **Settings → Environment Variables**, add `MONGODB_URI`.
-3. Deploy, then check `https://<your-app>.vercel.app/api/health` returns `{"status":"ok"}` and that reloading a `/place/<id>` URL shows the page.
+2. In **Settings → Environment Variables**, add `MONGODB_URI`. Alternatively, `npx vercel integration add mongodbatlas --plan FREE` creates a free Atlas cluster and sets the variable for you.
+3. Seed it: `npx vercel env pull .env.production.local --environment production`, then `node --env-file=.env.production.local server/seed.js --replace`.
+4. Deploy, then check `https://<your-app>.vercel.app/api/health` returns `{"status":"ok"}` and that reloading a `/place/<id>` URL shows the page.
 
 The Node version comes from `engines.node` in `package.json` (22.x).
 
