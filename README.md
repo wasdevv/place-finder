@@ -4,6 +4,8 @@ Find places near you on a map. A list of nearby places on the left, an OpenStree
 
 It ships with real places in São José do Rio Preto, Brazil: pharmacies, malls, parks, the zoo, rivers and lakes. Categories, city and branding live in one config file, so it works for anything with a name and a coordinate.
 
+**Live:** https://place-finder-five.vercel.app
+
 ![Place Finder](docs/screenshot.jpg)
 
 ## Features
